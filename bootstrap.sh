@@ -82,5 +82,5 @@ log "Note: You may be prompted to confirm the installation."
 log "Use './setup.sh --force' to skip confirmation prompts."
 
 # Execute the setup script
-exec ./setup.sh "$@"</content>
+./setup.sh "$@"</content>
 <parameter name="filePath">/Users/moeen/Desktop/Codes/linux-setup/bootstrap.sh
