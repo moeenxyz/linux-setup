@@ -29,9 +29,20 @@ if [[ -f "$SCRIPT_DIR/lib/system.sh" ]]; then
     source "$SCRIPT_DIR/lib/system.sh"
 else
     # Fallback system functions
-    check_root() { [[ $EUID -eq 0 ]] && { error "This script should not be run as root"; exit 1; } || true; }
-    check_sudo() { sudo -n true 2>/dev/null || sudo -v || { error "Sudo access required"; exit 1; }; }
-    validate_system() { log "System validation skipped (lib not available)"; }
+    check_root() {
+        # Allow running as root - no restrictions
+        log "Running as root - proceeding"
+    }
+    check_sudo() {
+        if [[ $EUID -eq 0 ]]; then
+            log "Running as root - sudo not needed"
+        else
+            sudo -n true 2>/dev/null || sudo -v || { error "Sudo access required"; exit 1; }
+        fi
+    }
+    validate_system() {
+        log "System validation skipped (lib not available)"
+    }
 fi
 
 # Function to show usage

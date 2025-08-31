@@ -4,23 +4,27 @@
 # Check if running as root or with sudo
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        error "This script should not be run as root directly."
-        error "Please run as a regular user with sudo privileges."
-        exit 1
+        log "Running as root - proceeding with installation"
+    else
+        log "Running as regular user - will use sudo when needed"
     fi
 }
 
 # Check sudo privileges
 check_sudo() {
-    if ! sudo -n true 2>/dev/null; then
-        log "Testing sudo privileges..."
-        if ! sudo -v; then
-            error "This script requires sudo privileges."
-            error "Please ensure your user has sudo access."
-            exit 1
+    if [[ $EUID -eq 0 ]]; then
+        log "Running as root - sudo not needed"
+    else
+        if ! sudo -n true 2>/dev/null; then
+            log "Testing sudo privileges..."
+            if ! sudo -v; then
+                error "This script requires sudo privileges."
+                error "Please ensure your user has sudo access."
+                exit 1
+            fi
         fi
+        log "Sudo privileges confirmed"
     fi
-    log "Sudo privileges confirmed"
 }
 
 # Check if running on Ubuntu
