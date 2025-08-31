@@ -77,15 +77,36 @@ install_nodejs_package() {
         # Install Node.js LTS
         sudo apt install -y nodejs
 
+        # Ensure npm is present; NodeSource usually installs npm but provide a fallback
+        if ! command -v npm >/dev/null 2>&1; then
+            log "npm not found after nodejs install; installing 'npm' package via apt..."
+            sudo apt update
+            sudo apt install -y npm || warn "Unable to install apt 'npm' package"
+        fi
+
         # Verify installation
         local node_version=$(node --version 2>/dev/null || echo "unknown")
         local npm_version=$(npm --version 2>/dev/null || echo "unknown")
 
         log "Node.js $node_version and npm $npm_version (LTS) installed successfully"
 
-        # Update npm to latest version
-        log "Updating npm to latest version..."
-        sudo npm install -g npm@latest
+        # Update npm to latest version (use sudo in case npm was installed system-wide)
+        if command -v npm >/dev/null 2>&1; then
+            log "Updating npm to latest version..."
+            sudo npm install -g npm@latest || warn "Could not update npm via npm@latest"
+        else
+            warn "npm still not available; skipping npm update"
+        fi
+
+        # Configure npm global prefix and cache to server-data for persistence
+        TARGET_USER="${SUDO_USER:-$USER}"
+        log "Configuring npm global prefix and cache for user: $TARGET_USER"
+        sudo mkdir -p /server-data/apps/node_modules /server-data/data/cache/npm
+        sudo chown -R "$TARGET_USER":"$TARGET_USER" /server-data/apps /server-data/data || true
+        if command -v npm >/dev/null 2>&1; then
+            sudo -u "$TARGET_USER" npm config set prefix /server-data/apps/node_modules || true
+            sudo -u "$TARGET_USER" npm config set cache /server-data/data/cache/npm --global || true
+        fi
 
         log "Node.js LTS setup completed successfully"
     fi
