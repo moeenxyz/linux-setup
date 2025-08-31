@@ -36,64 +36,34 @@ fi
 
 # Function to show usage
 show_usage() {
-    cat << EOF
-Ubuntu Server Setup Script - Modular Version
-
-Usage: $SCRIPT_NAME [OPTIONS]
-
-Options:
-    -h, --help          Show this help message
-    -v, --verbose       Enable verbose output
-    -d, --dry-run       Show what would be done without making changes
-    -c, --config FILE   Use specific configuration file (default: .env)
-    --skip-validation   Skip system validation checks
-    --force             Force installation even if components are already installed
-
-Environment Configuration (.env file):
-    # Core Settings
-    INSTALL_ESSENTIALS=Y     # Install essential tools (git, node, zsh)
-    INSTALL_DOCKER=Y         # Install Docker CE and Compose
-    INSTALL_ZFS=Y           # Install ZFS with migration setup
-    INSTALL_CLOUDFLARED=Y   # Install Cloudflare tunnel
-    INSTALL_FAIL2BAN=Y     # Install Fail2Ban intrusion prevention
-    CONFIGURE_MONITORING=Y # Set up system monitoring
-
-    # SSH Configuration
-    SSH_PORT=22             # Custom SSH port (default: 22)
-    ALLOW_HTTP=Y            # Allow HTTP traffic
-    ALLOW_HTTPS=Y           # Allow HTTPS traffic
-
-    # ZFS Configuration
-    CREATE_ZFS_POOL=Y       # Create ZFS pool for migration
-    ZFS_POOL_TYPE=1         # 1=file-based, 2=disk-based
-    ZFS_DISK=               # Disk device for ZFS pool (if type=2)
-    ZFS_DISK_CONFIRM=N      # Confirm disk destruction
-
-    # Cloudflared Configuration
-    CLOUDFLARED_TUNNEL_NAME=  # Tunnel name
-    CLOUDFLARED_DOMAIN=       # Domain for tunnel routing
-    CLOUDFLARED_TUNNEL_UUID=  # Tunnel UUID
-    CLOUDFLARED_TUNNEL_SECRET= # Tunnel secret
-
-    # Custom Configuration
-    CUSTOM_UFW_PORTS=        # Additional ports to allow (format: 8080/tcp,9000/udp)
-
-Examples:
-    $SCRIPT_NAME                    # Run with default .env configuration
-    $SCRIPT_NAME --config myconfig.env  # Use custom configuration file
-    $SCRIPT_NAME --verbose          # Enable verbose output
-    $SCRIPT_NAME --dry-run          # Show what would be done
-
-Modules:
-    - Essentials: Git, Node.js LTS, Zsh, development tools
-    - Docker: Docker CE, Compose v2, optimized configuration
-    - ZFS: Complete filesystem setup with migration tools
-    - Cloudflared: Secure tunnel access with management scripts
-    - Security: Fail2Ban intrusion prevention, system limits
-    - Monitoring: Automated monitoring and maintenance scripts
-
-For more information, see the README.md file.
-EOF
+    echo "Ubuntu Server Setup Script - Modular Version"
+    echo ""
+    echo "Usage: $SCRIPT_NAME [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "    -h, --help          Show this help message"
+    echo "    -v, --verbose       Enable verbose output"
+    echo "    -d, --dry-run       Show what would be done without making changes"
+    echo "    -c, --config FILE   Use specific configuration file (default: .env)"
+    echo "    --skip-validation   Skip system validation checks"
+    echo "    --force             Force installation even if components are already installed"
+    echo ""
+    echo "Environment Configuration (.env file):"
+    echo "    # Core Settings"
+    echo "    INSTALL_ESSENTIALS=Y     # Install essential tools (git, node, zsh)"
+    echo "    INSTALL_DOCKER=Y         # Install Docker CE and Compose"
+    echo "    INSTALL_ZFS=Y           # Install ZFS with migration setup"
+    echo "    INSTALL_CLOUDFLARED=Y   # Install Cloudflare tunnel"
+    echo "    INSTALL_FAIL2BAN=Y     # Install Fail2Ban intrusion prevention"
+    echo "    CONFIGURE_MONITORING=Y # Set up system monitoring"
+    echo ""
+    echo "Examples:"
+    echo "    $SCRIPT_NAME                    # Run with default .env configuration"
+    echo "    $SCRIPT_NAME --config myconfig.env  # Use custom configuration file"
+    echo "    $SCRIPT_NAME --verbose          # Enable verbose output"
+    echo "    $SCRIPT_NAME --dry-run          # Show what would be done"
+    echo ""
+    echo "For more information, see the README.md file."
 }
 
 # Parse command line arguments
