@@ -5,13 +5,34 @@
 set -euo pipefail
 
 # Script configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+# Handle both direct execution and piped execution
+if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "bash" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    # When piped to bash, assume we're in a temp directory
+    SCRIPT_DIR="$(pwd)"
+fi
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]:-setup.sh}")"
 START_TIME=$(date +%s)
 
 # Load common functions
-source "$SCRIPT_DIR/lib/common.sh"
-source "$SCRIPT_DIR/lib/system.sh"
+if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+    source "$SCRIPT_DIR/lib/common.sh"
+else
+    # Fallback functions if lib files are not available
+    log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
+    error() { echo "[ERROR] $1" >&2; exit 1; }
+    warn() { echo "[WARNING] $1"; }
+fi
+
+if [[ -f "$SCRIPT_DIR/lib/system.sh" ]]; then
+    source "$SCRIPT_DIR/lib/system.sh"
+else
+    # Fallback system functions
+    check_root() { [[ $EUID -eq 0 ]] && { error "This script should not be run as root"; exit 1; } || true; }
+    check_sudo() { sudo -n true 2>/dev/null || sudo -v || { error "Sudo access required"; exit 1; }; }
+    validate_system() { log "System validation skipped (lib not available)"; }
+fi
 
 # Function to show usage
 show_usage() {
