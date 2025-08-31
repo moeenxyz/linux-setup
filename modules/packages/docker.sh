@@ -37,29 +37,61 @@ install_docker_package() {
         log "Installing Docker CE..."
         sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-        # Start and enable Docker service
-        log "Starting Docker service..."
-        sudo systemctl start docker
-        sudo systemctl enable docker
+                # Start and enable Docker service
+                log "Starting Docker service..."
+                sudo systemctl start docker
+                sudo systemctl enable docker
 
-        # Add current user to docker group
-        log "Adding user to docker group..."
-        sudo usermod -aG docker $USER
+                # Ensure docker group exists and add target user
+                TARGET_USER="${SUDO_USER:-$USER}"
+                log "Ensuring docker group exists and adding user $TARGET_USER to it..."
+                sudo groupadd -f docker
+                sudo usermod -aG docker "$TARGET_USER"
 
-        # Verify installation
-        local docker_version=$(docker --version 2>/dev/null | head -1 || echo "unknown")
-        log "Docker installed: $docker_version"
+                # Configure daemon and socket permissions
+                configure_docker_daemon() {
+                        log "Configuring Docker daemon (/etc/docker/daemon.json)..."
+                        sudo mkdir -p /etc/docker
+                        sudo tee /etc/docker/daemon.json > /dev/null <<'JSON'
+{
+    "data-root": "/server-data/docker",
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+    },
+    "storage-driver": "overlay2",
+    "features": {
+        "buildkit": true
+    }
+}
+JSON
+                        # Restart docker to pick up configuration
+                        sudo systemctl restart docker || warn "Could not restart docker after daemon config"
 
-        # Test Docker installation
-        log "Testing Docker installation..."
-        if timeout 30s docker run --rm hello-world >/dev/null 2>&1; then
-            log "Docker test successful"
-        else
-            warn "Docker test failed or timed out"
-        fi
+                        # Ensure socket group and permissions are correct
+                        sudo chown root:docker /var/run/docker.sock || true
+                        sudo chmod 660 /var/run/docker.sock || true
 
-        log "Docker CE installed successfully"
-        warn "Please log out and log back in for Docker group changes to take effect"
+                        log "Docker daemon configuration applied"
+                }
+
+                configure_docker_daemon
+
+                # Verify installation
+                local docker_version=$(sudo docker --version 2>/dev/null | head -1 || echo "unknown")
+                log "Docker installed: $docker_version"
+
+                # Test Docker installation (use sudo to avoid group timing issues)
+                log "Testing Docker installation..."
+                if timeout 30s sudo docker run --rm hello-world >/dev/null 2>&1; then
+                        log "Docker test successful"
+                else
+                        warn "Docker test failed or timed out"
+                fi
+
+                log "Docker CE installed successfully"
+                warn "Please log out and log back in for Docker group changes to take effect (or run 'newgrp docker')"
     fi
 }
 
