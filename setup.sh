@@ -6,10 +6,10 @@ set -euo pipefail
 
 # Script configuration
 # Handle both direct execution and piped execution
-if [[ -n "${BASH_SOURCE[0]}" && "${BASH_SOURCE[0]}" != "bash" ]]; then
+if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]:-}" != "bash" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 else
-    # When piped to bash, assume we're in a temp directory
+    # When piped to bash, assume we're in the current working directory
     SCRIPT_DIR="$(pwd)"
 fi
 SCRIPT_NAME="$(basename "${BASH_SOURCE[0]:-setup.sh}")"
@@ -17,25 +17,32 @@ START_TIME=$(date +%s)
 
 # Load common functions
 if [[ -f "$SCRIPT_DIR/lib/common.sh" ]]; then
+    # shellcheck source=/dev/null
     source "$SCRIPT_DIR/lib/common.sh"
 else
-    # Fallback functions if lib files are not available
+    # Minimal fallback functions
     log() { echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
-    error() { echo "[ERROR] $1" >&2; exit 1; }
+    error() { echo "[ERROR] $1" >&2; }
     warn() { echo "[WARNING] $1"; }
+    # Note: fallbacks do not exit on error so bootstrap can inspect syntax first
 fi
 
 if [[ -f "$SCRIPT_DIR/lib/system.sh" ]]; then
+    # shellcheck source=/dev/null
     source "$SCRIPT_DIR/lib/system.sh"
 else
-    # Fallback system functions
+    # Fallback system helpers
     check_root() {
-        # Allow running as root - no restrictions
-        log "Running as root - proceeding"
+        # Allow running as root if requested
+        if [[ $EUID -eq 0 ]]; then
+            log "Running as root - proceeding"
+        else
+            log "Running as regular user"
+        fi
     }
     check_sudo() {
         if [[ $EUID -eq 0 ]]; then
-            log "Running as root - sudo not needed"
+            log "Running as root - sudo not required"
         else
             sudo -n true 2>/dev/null || sudo -v || { error "Sudo access required"; exit 1; }
         fi
@@ -45,36 +52,21 @@ else
     }
 fi
 
-# Function to show usage
+# Function to show usage (simple echo lines to avoid heredoc issues when piped)
 show_usage() {
     echo "Ubuntu Server Setup Script - Modular Version"
-    echo ""
+    echo
     echo "Usage: $SCRIPT_NAME [OPTIONS]"
-    echo ""
+    echo
     echo "Options:"
-    echo "    -h, --help          Show this help message"
-    echo "    -v, --verbose       Enable verbose output"
-    echo "    -d, --dry-run       Show what would be done without making changes"
-    echo "    -c, --config FILE   Use specific configuration file (default: .env)"
-    echo "    --skip-validation   Skip system validation checks"
-    echo "    --force             Force installation even if components are already installed"
-    echo ""
-    echo "Environment Configuration (.env file):"
-    echo "    # Core Settings"
-    echo "    INSTALL_ESSENTIALS=Y     # Install essential tools (git, node, zsh)"
-    echo "    INSTALL_DOCKER=Y         # Install Docker CE and Compose"
-    echo "    INSTALL_ZFS=Y           # Install ZFS with migration setup"
-    echo "    INSTALL_CLOUDFLARED=Y   # Install Cloudflare tunnel"
-    echo "    INSTALL_FAIL2BAN=Y     # Install Fail2Ban intrusion prevention"
-    echo "    CONFIGURE_MONITORING=Y # Set up system monitoring"
-    echo ""
-    echo "Examples:"
-    echo "    $SCRIPT_NAME                    # Run with default .env configuration"
-    echo "    $SCRIPT_NAME --config myconfig.env  # Use custom configuration file"
-    echo "    $SCRIPT_NAME --verbose          # Enable verbose output"
-    echo "    $SCRIPT_NAME --dry-run          # Show what would be done"
-    echo ""
-    echo "For more information, see the README.md file."
+    echo "  -h, --help          Show this help message"
+    echo "  -v, --verbose       Enable verbose output"
+    echo "  -d, --dry-run       Show what would be done without making changes"
+    echo "  -c, --config FILE   Use specific configuration file (default: .env)"
+    echo "  --skip-validation   Skip system validation checks"
+    echo "  --force             Force installation even if components are already installed"
+    echo
+    echo "Environment configuration is read from .env if present. See README.md for details."
 }
 
 # Parse command line arguments
@@ -137,7 +129,8 @@ main() {
     # Load configuration
     if [[ -f "$CONFIG_FILE" ]]; then
         log "Loading configuration from $CONFIG_FILE..."
-        load_config "$CONFIG_FILE"
+        # shellcheck disable=SC1090
+        source "$CONFIG_FILE"
     else
         warn "Configuration file $CONFIG_FILE not found, using defaults"
     fi
@@ -162,7 +155,7 @@ main() {
     if [[ "$FORCE" == "false" && "$DRY_RUN" == "false" ]]; then
         # Check if running interactively
         if [[ -t 0 ]]; then
-            echo ""
+            echo
             read -p "Do you want to proceed with the installation? (y/N): " -r
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 log "Installation cancelled by user"
@@ -188,20 +181,16 @@ show_installation_plan() {
     log "Installation Plan:"
 
     echo "Core Components:"
-    if [ "${INSTALL_ESSENTIALS:-Y}" = "Y" ] || [ "${INSTALL_ESSENTIALS:-Y}" = "y" ]; then echo "  [OK] Essential tools (Git, Node.js, Zsh)"; fi
-    if [ "${INSTALL_DOCKER:-Y}" = "Y" ] || [ "${INSTALL_DOCKER:-Y}" = "y" ]; then echo "  [OK] Docker CE and Compose"; fi
-    if [ "${INSTALL_ZFS:-Y}" = "Y" ] || [ "${INSTALL_ZFS:-Y}" = "y" ]; then echo "  [OK] ZFS filesystem with migration setup"; fi
-    if [ "${INSTALL_CLOUDFLARED:-Y}" = "Y" ] || [ "${INSTALL_CLOUDFLARED:-Y}" = "y" ]; then echo "  [OK] Cloudflare tunnel"; fi
+    [[ "${INSTALL_ESSENTIALS:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] Essential tools (Git, Node.js, Zsh)"
+    [[ "${INSTALL_DOCKER:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] Docker CE and Compose"
+    [[ "${INSTALL_ZFS:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] ZFS filesystem with migration setup"
+    [[ "${INSTALL_CLOUDFLARED:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] Cloudflare tunnel"
 
     echo "Security & Services:"
-    if [ "${CONFIGURE_FIREWALL:-Y}" = "Y" ] || [ "${CONFIGURE_FIREWALL:-Y}" = "y" ]; then echo "  [OK] UFW firewall configuration"; fi
-    if [ "${HARDEN_SSH:-Y}" = "Y" ] || [ "${HARDEN_SSH:-Y}" = "y" ]; then echo "  [OK] SSH hardening (port: ${SSH_PORT:-22})"; fi
-    if [ "${INSTALL_FAIL2BAN:-Y}" = "Y" ] || [ "${INSTALL_FAIL2BAN:-Y}" = "y" ]; then echo "  [OK] Fail2Ban intrusion prevention"; fi
-    if [ "${CONFIGURE_MONITORING:-Y}" = "Y" ] || [ "${CONFIGURE_MONITORING:-Y}" = "y" ]; then echo "  [OK] System monitoring and maintenance"; fi
-
-    echo "Configuration:"
-    # if [ -n "${CLOUDFLARED_DOMAIN:-}" ]; then echo "  [OK] Cloudflared domain: ${CLOUDFLARED_DOMAIN}"; fi
-    # if [ -n "${CUSTOM_UFW_PORTS:-}" ]; then echo "  [OK] Custom firewall ports: ${CUSTOM_UFW_PORTS}"; fi
+    [[ "${CONFIGURE_FIREWALL:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] UFW firewall configuration"
+    [[ "${HARDEN_SSH:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] SSH hardening (port: ${SSH_PORT:-22})"
+    [[ "${INSTALL_FAIL2BAN:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] Fail2Ban intrusion prevention"
+    [[ "${CONFIGURE_MONITORING:-Y}" =~ ^[Yy]$ ]] && echo "  [OK] System monitoring and maintenance"
 
     log "End of show_installation_plan"
 }
@@ -211,13 +200,14 @@ execute_modules() {
     log "Starting module execution..."
 
     # Load package modules
-    source "$SCRIPT_DIR/modules/packages/essentials.sh"
-    source "$SCRIPT_DIR/modules/packages/docker.sh"
-    source "$SCRIPT_DIR/modules/packages/zfs.sh"
-    source "$SCRIPT_DIR/modules/packages/cloudflared.sh"
+    # shellcheck disable=SC1090
+    source "$SCRIPT_DIR/modules/packages/essentials.sh" || true
+    source "$SCRIPT_DIR/modules/packages/docker.sh" || true
+    source "$SCRIPT_DIR/modules/packages/zfs.sh" || true
+    source "$SCRIPT_DIR/modules/packages/cloudflared.sh" || true
 
     # Load service modules
-    source "$SCRIPT_DIR/modules/services/security.sh"
+    source "$SCRIPT_DIR/modules/services/security.sh" || true
 
     # Execute modules in order
     local modules=(
@@ -237,7 +227,7 @@ execute_modules() {
             log "[DRY RUN] Would execute: $module"
         else
             log "Executing module: $module"
-            if command -v "$module" >/dev/null 2>&1; then
+            if declare -f "$module" >/dev/null 2>&1; then
                 if "$module"; then
                     log "Module $module completed successfully"
                 else
@@ -251,8 +241,8 @@ execute_modules() {
 
     # Start and enable services
     if [[ "$DRY_RUN" == "false" ]]; then
-        start_services
-        enable_services
+        start_services || true
+        enable_services || true
     else
         log "[DRY RUN] Would start and enable services"
     fi
@@ -262,7 +252,7 @@ execute_modules() {
 show_completion_summary() {
     log "Installation Summary:"
 
-    echo ""
+    echo
     echo "✓ Essential tools installed and configured"
     echo "✓ Docker CE and Compose v2 ready for use"
     echo "✓ ZFS filesystem configured with migration tools"
@@ -270,7 +260,7 @@ show_completion_summary() {
     echo "✓ Fail2Ban protecting against brute force attacks"
     echo "✓ System monitoring and maintenance scripts installed"
 
-    echo ""
+    echo
     echo "Management Commands:"
     echo "  Server monitoring: server-monitor.sh"
     echo "  Docker management: docker --version && docker-compose --version"
@@ -278,7 +268,7 @@ show_completion_summary() {
     echo "  Cloudflared tunnel: cloudflared-manage.sh status|start|stop"
     echo "  Fail2Ban status: sudo fail2ban-client status"
 
-    echo ""
+    echo
     echo "Configuration Files:"
     echo "  Docker: /etc/docker/daemon.json"
     echo "  Fail2Ban: /etc/fail2ban/jail.local"
@@ -286,14 +276,14 @@ show_completion_summary() {
     echo "  System limits: /etc/security/limits.d/server-limits.conf"
 
     if [[ -n "${CLOUDFLARED_DOMAIN:-}" ]]; then
-        echo ""
+        echo
         echo "Cloudflare Tunnel Access:"
         echo "  HTTPS: https://${CLOUDFLARED_DOMAIN}"
         echo "  SSH: ssh://ssh.${CLOUDFLARED_DOMAIN}"
         echo "  API: https://api.${CLOUDFLARED_DOMAIN}"
     fi
 
-    echo ""
+    echo
     echo "For detailed logs, check: /var/log/server-setup.log"
 }
 
