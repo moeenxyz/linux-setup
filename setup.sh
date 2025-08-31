@@ -211,8 +211,10 @@ execute_modules() {
 
     # Execute modules in order
     local modules=(
-        "install_essential_tools"
+    "install_essential_tools"
+    "install_nodejs_package"
         "install_docker_package"
+    "install_compose_package"
         "install_zfs_package"
         "install_cloudflared_package"
         "install_fail2ban"
